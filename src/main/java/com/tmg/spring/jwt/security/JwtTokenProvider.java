@@ -1,4 +1,4 @@
-package murraco.security;
+package com.tmg.spring.jwt.security;
 
 import java.util.Base64;
 import java.util.Date;
@@ -18,12 +18,13 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
+import com.tmg.spring.jwt.model.Role;
+import com.tmg.spring.jwt.security.exception.CustomException;
+
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
-import murraco.exception.CustomException;
-import murraco.model.Role;
 
 @Component
 public class JwtTokenProvider {
@@ -39,7 +40,7 @@ public class JwtTokenProvider {
   private long validityInMilliseconds = 3600000; // 1h
 
   @Autowired
-  private MyUserDetails myUserDetails;
+  private JwtUserDetails myUserDetails;
 
   @PostConstruct
   protected void init() {

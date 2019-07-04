@@ -1,4 +1,4 @@
-package murraco.exception;
+package com.tmg.spring.jwt.security.exception;
 
 import org.springframework.http.HttpStatus;
 

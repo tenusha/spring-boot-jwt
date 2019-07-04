@@ -1,20 +1,36 @@
-package murraco.dto;
+package com.tmg.spring.jwt.model;
 
 import java.util.List;
 
-import io.swagger.annotations.ApiModelProperty;
-import murraco.model.Role;
+import javax.validation.constraints.Size;
 
-public class UserDataDTO {
-  
-  @ApiModelProperty(position = 0)
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
+
+@Document(collection = "users")
+public class User {
+
+  @Id
+  private String id;
+
+  @Size(min = 4, max = 255, message = "Minimum username length: 4 characters")
   private String username;
-  @ApiModelProperty(position = 1)
+
+
   private String email;
-  @ApiModelProperty(position = 2)
+
+  @Size(min = 4, message = "Minimum password length: 4 characters")
   private String password;
-  @ApiModelProperty(position = 3)
+
   List<Role> roles;
+
+  public String getId() {
+    return id;
+  }
+
+  public void setId(String id) {
+    this.id = id;
+  }
 
   public String getUsername() {
     return username;
