@@ -6,67 +6,10 @@
 
 ![](https://img.shields.io/badge/java_8-✓-blue.svg)
 ![](https://img.shields.io/badge/spring_boot-✓-blue.svg)
-![](https://img.shields.io/badge/mysql-✓-blue.svg)
+![](https://img.shields.io/badge/mongo-✓-blue.svg)
 ![](https://img.shields.io/badge/jwt-✓-blue.svg)
-![](https://img.shields.io/badge/swagger_2-✓-blue.svg)
 
 You can find a related post for this repository [here](https://medium.com/@xoor/jwt-authentication-service-44658409e12c).
-
-***
-
-<h3 align="center">Please help this repo with a :star: if you find it useful! :blush:</h3>
-
-***
-
-# File structure
-
-```
-spring-boot-jwt/
- │
- ├── src/main/java/
- │   └── murraco
- │       ├── configuration
- │       │   └── SwaggerConfig.java
- │       │
- │       ├── controller
- │       │   └── UserController.java
- │       │
- │       ├── dto
- │       │   ├── UserDataDTO.java
- │       │   └── UserResponseDTO.java
- │       │
- │       ├── exception
- │       │   ├── CustomException.java
- │       │   └── GlobalExceptionController.java
- │       │
- │       ├── model
- │       │   ├── Role.java
- │       │   └── User.java
- │       │
- │       ├── repository
- │       │   └── UserRepository.java
- │       │
- │       ├── security
- │       │   ├── JwtTokenFilter.java
- │       │   ├── JwtTokenFilterConfigurer.java
- │       │   ├── JwtTokenProvider.java
- │       │   ├── MyUserDetails.java
- │       │   └── WebSecurityConfig.java
- │       │
- │       ├── service
- │       │   └── UserService.java
- │       │
- │       └── JwtAuthServiceApp.java
- │
- ├── src/main/resources/
- │   └── application.yml
- │
- ├── .gitignore
- ├── LICENSE
- ├── mvnw/mvnw.cmd
- ├── README.md
- └── pom.xml
-```
 
 # Introduction (https://jwt.io)
 
@@ -211,118 +154,6 @@ It's important to note that authorization claims will be included with the Acces
 
 Let's see how can we implement the JWT token based authentication using Java and Spring, while trying to reuse the Spring security default behavior where we can. The Spring Security framework comes with plug-in classes that already deal with authorization mechanisms such as: session cookies, HTTP Basic, and HTTP Digest. Nevertheless, it lacks from native support for JWT, and we need to get our hands dirty to make it work.
 
-## MySQL DB
-
-This demo is currently using a MySQL database called **user_db** that's automatically configured by Spring Boot. If you want to connect to another database you have to specify the connection in the `application.yml` file inside the resource directory. Note that `hibernate.hbm2ddl.auto=create-drop` will drop and create a clean database each time we deploy (you may want to change it if you are using this in a real project). Here's the example from the project:
-
-```yml
-spring:
-  datasource:
-    url: jdbc:mysql://localhost:3306/user_db
-    username: root
-    password: null
-  tomcat:
-    max-wait: 20000
-    max-active: 50
-    max-idle: 20
-    min-idle: 15
-  jpa:
-    hibernate:
-      ddl-auto: create-drop
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.MySQLDialect
-        format_sql: true
-        id:
-          new_generator_mappings: false
-```
-
-## Core Code
-
-1. `JwtTokenFilter`
-2. `JwtTokenFilterConfigurer`
-3. `JwtTokenProvider`
-4. `MyUserDetails`
-5. `WebSecurityConfig`
-
-**JwtTokenFilter**
-
-The `JwtTokenFilter` filter is applied to each API (`/**`) with exception of the signin token endpoint (`/users/signin`) and singup endpoint (`/users/signup`).
-
-This filter has the following responsibilities:
-
-1. Check for access token in Authorization header. If Access token is found in the header, delegate authentication to `JwtTokenProvider` otherwise throw authentication exception
-2. Invokes success or failure strategies based on the outcome of authentication process performed by JwtTokenProvider
-
-Please ensure that `chain.doFilter(request, response)` is invoked upon successful authentication. You want processing of the request to advance to the next filter, because very last one filter *FilterSecurityInterceptor#doFilter* is responsible to actually invoke method in your controller that is handling requested API resource.
-
-```java
-String token = jwtTokenProvider.resolveToken((HttpServletRequest) req);
-if (token != null && jwtTokenProvider.validateToken(token)) {
-  Authentication auth = jwtTokenProvider.getAuthentication(token);
-  SecurityContextHolder.getContext().setAuthentication(auth);
-}
-filterChain.doFilter(req, res);
-```
-
-**JwtTokenFilterConfigurer**
-
-Adds the `JwtTokenFilter` to the `DefaultSecurityFilterChain` of spring boot security.
-
-```java
-JwtTokenFilter customFilter = new JwtTokenFilter(jwtTokenProvider);
-http.addFilterBefore(customFilter, UsernamePasswordAuthenticationFilter.class);
-```
-
-**JwtTokenProvider**
-
-The `JwtTokenProvider` has the following responsibilities:
-
-1. Verify the access token's signature
-2. Extract identity and authorization claims from Access token and use them to create UserContext
-3. If Access token is malformed, expired or simply if token is not signed with the appropriate signing key Authentication exception will be thrown
-
-**MyUserDetails**
-
-Implements `UserDetailsService` in order to define our own custom *loadUserbyUsername* function. The `UserDetailsService` interface is used to retrieve user-related data. It has one method named *loadUserByUsername* which finds a user entity based on the username and can be overridden to customize the process of finding the user.
-
-It is used by the `DaoAuthenticationProvider` to load details about the user during authentication.
-
-**WebSecurityConfig**
-
-The `WebSecurityConfig` class extends `WebSecurityConfigurerAdapter` to provide custom security configuration.
-
-Following beans are configured and instantiated in this class:
-
-1. `JwtTokenFilter`
-3. `PasswordEncoder`
-
-Also, inside `WebSecurityConfig#configure(HttpSecurity http)` method we'll configure patterns to define protected/unprotected API endpoints. Please note that we have disabled CSRF protection because we are not using Cookies.
-
-```java
-// Disable CSRF (cross site request forgery)
-http.csrf().disable();
-
-// No session will be created or used by spring security
-http.sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS);
-
-// Entry points
-http.authorizeRequests()//
-  .antMatchers("/users/signin").permitAll()//
-  .antMatchers("/users/signup").permitAll()//
-  // Disallow everything else..
-  .anyRequest().authenticated();
-
-// If a user try to access a resource without having enough permissions
-http.exceptionHandling().accessDeniedPage("/login");
-
-// Apply JWT
-http.apply(new JwtTokenFilterConfigurer(jwtTokenProvider));
-
-// Optional, if you want to test the API from a browser
-// http.httpBasic();
-```
-
 # How to use this code?
 
 1. Make sure you have [Java 8](https://www.java.com/download/) and [Maven](https://maven.apache.org) installed
@@ -351,53 +182,24 @@ http.apply(new JwtTokenFilterConfigurer(jwtTokenProvider));
   $ mvn spring-boot:run
   ```
 
-6. Navigate to `http://localhost:8080/swagger-ui.html` in your browser to check everything is working correctly. You can change the default port in the following `application.yml` file
+6. Make a POST request to `/users/signup` with the following data to create a new user.
 
-  ```yml
-  server:
-    port: 8090
-  ```
-
-7. Make a GET request to `/users/me` to check you're not authenticated. You should receive a response with a `403` with an `Access Denied` message since you haven't set your valid JWT token yet
-
-  ```
-  $ curl -X GET http://localhost:8080/users/me
-  ```
-
-8. Make a POST request to `/users/signin` with the default admin user we programatically created to get a valid JWT token
-
-  ```
-  $ curl -X POST 'http://localhost:8080/users/signin?username=admin&password=admin'
-  ```
-
-9. Add the JWT token as a Header parameter and make the initial GET request to `/users/me` again
-
-  ```
-  $ curl -X GET http://localhost:8080/users/me -H 'Authorization: Bearer <JWT_TOKEN>'
-  ```
-
-10. And that's it, congrats! You should get a similar response to this one, meaning that you're now authenticated
-
-  ```javascript
+ ```javascript
   {
-    "id": 1,
     "username": "admin",
     "email": "admin@email.com",
+    "password":"admin",
     "roles": [
       "ROLE_ADMIN"
     ]
   }
   ``` 
+ 7. Make a POST request to `/users/signin` with the created user details to get a valid JWT token.
 
-# Contribution
-
-- Report issues
-- Open pull request with improvements
-- Spread the word
-- Reach out to me directly at <mauriurraco@gmail.com>
-
-# Donate
-
-`btc: 36V7HqqENSKn6iFCBuE4iCdtB29uGoCKzN`
-
-`eth: 0xB419E3E9fa2233383E0877d442e55C34B9C944dD`
+  ```javascript
+    {
+    "username": "admin",
+    "password":"admin"
+    ]
+  }
+  ```
